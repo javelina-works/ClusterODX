@@ -1,0 +1,6 @@
+{
+    "public-address": "http://clusterodx:3000",
+    "log-level": "debug",
+    "cluster-address": "legacy-still-accepted",
+    "port": 4000
+}

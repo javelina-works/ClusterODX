@@ -1,0 +1,5 @@
+{
+    "ssl-key": "/etc/ssl/key.pem",
+    "ssl-cert": "/etc/ssl/cert.pem",
+    "secure-port": 4443
+}
