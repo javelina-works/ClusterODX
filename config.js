@@ -217,12 +217,15 @@ if (process.argv.includes('--help')) {
 
 // ─── Load (defaults file, then user --config file, then env, then CLI) ───
 
-const config = convict(schema);
+// `validator` is the convict instance — held briefly to call .load() and
+// .validate(), then discarded. The exported object below is the resolved
+// plain object that every consumer accesses as `config.foo`.
+const validator = convict(schema);
 
 try {
     const defaultsPath = 'config-default.json';
     if (fs.existsSync(defaultsPath)) {
-        config.load(kebabToSnake(JSON.parse(fs.readFileSync(defaultsPath, 'utf8'))));
+        validator.load(kebabToSnake(JSON.parse(fs.readFileSync(defaultsPath, 'utf8'))));
     }
 } catch (e) {
     console.warn(`config-default.json: ${e.message}`);
@@ -232,7 +235,7 @@ try {
 const userPath = cliArg('config');
 if (userPath && userPath !== 'config-default.json') {
     try {
-        config.load(kebabToSnake(JSON.parse(fs.readFileSync(userPath, 'utf8'))));
+        validator.load(kebabToSnake(JSON.parse(fs.readFileSync(userPath, 'utf8'))));
     } catch (e) {
         console.warn(`${userPath}: ${e.message}`);
         process.exit(1);
@@ -240,29 +243,27 @@ if (userPath && userPath !== 'config-default.json') {
 }
 
 // Strict mode: an operator config file containing a key that is not in
-// the schema above (typo, deprecated rename, half-finished migration)
-// throws here. This is the line that would have prevented the bug
-// we just spent four hours chasing.
-config.validate({ allowed: 'strict' });
+// the schema above (typo, deprecated rename, half-finished migration) throws here.
+validator.validate({ allowed: 'strict' });
 
 // ─── Compose the final config (preserving the previous public surface) ───
 
-const props = config.getProperties();
+const config = validator.getProperties();
 
 // Derived: SSL is "on" when both key and cert are configured.
-props.use_ssl = !!(props.ssl_key && props.ssl_cert);
+config.use_ssl = !!(config.ssl_key && config.ssl_cert);
 
 // Nested objects the original loader assembled by hand. Kept as-is so
 // existing readers (libs/logger.js, libs/accessLog.js) need no changes.
-props.logger = {
-    level:        props.log_level,
+config.logger = {
+    level:        config.log_level,
     maxFileSize:  1024 * 1024 * 100,   // 100 MB
     maxFiles:     10,
     logDirectory: '',
 };
-props.accessLog = {
+config.accessLog = {
     maxFileSize: 1024 * 1024 * 100,    // 100 MB
-    logFile:     props.access_log,
+    logFile:     config.access_log,
 };
 
-module.exports = props;
+module.exports = config;
