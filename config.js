@@ -77,19 +77,19 @@ const schema = {
     },
     secure_port: {
         doc:     'If SSL is enabled and you want to expose both a secure and non-secure service, set this. 0 = SSL-only.',
-        format:  'int',
+        format:  'port',                       // accepts 0..65535; 0 keeps the "disabled" sentinel
         default: 0,
         arg:     'secure-port',
     },
     admin_cli_port: {
         doc:     'Port to bind the admin CLI to. 0 disables.',
-        format:  'int',
+        format:  'port',
         default: 8080,
         arg:     'admin-cli-port',
     },
     admin_web_port: {
         doc:     'Port to bind the admin web interface to. 0 disables.',
-        format:  'int',
+        format:  'port',
         default: 10000,
         arg:     'admin-web-port',
     },
@@ -200,6 +200,51 @@ const schema = {
         default: '',
         arg:     'access-log',
     },
+    /**
+     * Nested 'logger' object. This technically introduces a new top-level key,
+     * but I noticed that it was a config in the NodeODX codebase: https://github.com/WebODM/NodeODX/blob/master/config-default.json
+     * Discussion about if this is worth adding in here.
+     */
+    // logger: {
+    //     level: {
+    //         doc:     'Log verbosity.',
+    //         format:  ['error', 'warn', 'info', 'verbose', 'debug', 'silly'],
+    //         default: 'info',
+    //         arg:     'log-level',
+    //     },
+    //     maxFileSize: {
+    //         doc:     'Max size of each log file in bytes.',
+    //         format:  'int',
+    //         default: 1024 * 1024 * 100, // 100 MB
+    //         arg:     'max-file-size',
+    //     },
+    //     maxFiles: {
+    //         doc:     'Max number of log files to keep.',
+    //         format:  'int',
+    //         default: 10,
+    //         arg:     'max-files',
+    //     },
+    //     logDirectory: {
+    //         doc:     'Directory in which to store the log files.',
+    //         format:  String,
+    //         default: '',
+    //         arg:     'log-directory',
+    //     },
+    // },
+    // accessLog: {
+    //     maxFileSize: {
+    //         doc:     'Max size of each log file in bytes.',
+    //         format:  'int',
+    //         default: 1024 * 1024 * 100, // 100 MB
+    //         arg:     'max-file-size',
+    //     },
+    //     logFile: {
+    //         doc:     'Path where to store the access log. Empty = no access log.',
+    //         format:  String,
+    //         default: '',
+    //         arg:     'access-log',
+    //     },
+    // }
 };
 
 // ─── --help (preserves the original CLI behavior) ────────────────────────
@@ -217,9 +262,7 @@ if (process.argv.includes('--help')) {
 
 // ─── Load (defaults file, then user --config file, then env, then CLI) ───
 
-// `validator` is the convict instance — held briefly to call .load() and
-// .validate(), then discarded. The exported object below is the resolved
-// plain object that every consumer accesses as `config.foo`.
+
 const validator = convict(schema);
 
 try {
@@ -242,8 +285,13 @@ if (userPath && userPath !== 'config-default.json') {
     }
 }
 
-// Strict mode: an operator config file containing a key that is not in
-// the schema above (typo, deprecated rename, half-finished migration) throws here.
+/**
+ * Convict's precidence ladder: 
+ * 1. schema default          (lowest — what we declared in the block)
+ * 2. .load(obj)              (each call layers on top)
+ * 3. process.env[env]        (if the schema entry has an env: field)
+ * 4. process.argv[--arg]     (highest — wins over everything)
+ */
 validator.validate({ allowed: 'strict' });
 
 // ─── Compose the final config (preserving the previous public surface) ───
